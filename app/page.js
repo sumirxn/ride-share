@@ -1,69 +1,135 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+
+"use client";
+
+import { useEffect, useState } from "react";
 
 export default function Home() {
+  const [rides, setRides] = useState([]);
+  const [popularRoutes, setPopularRoutes] = useState([]);
+  const [pickup, setPickup] = useState("");
+  const [drop, setDrop] = useState("");
+
+  async function fetchRides() {
+    const params = new URLSearchParams({
+      pickup: pickup,
+      drop: drop,
+    });
+
+    const response = await fetch(`/api/rides?${params}`);
+    const data = await response.json();
+    setRides(data);
+  }
+
+  async function fetchPopularRoutes() {
+    const response = await fetch("/api/popular-routes");
+    const data = await response.json();
+    setPopularRoutes(data);
+  }
+
+  useEffect(() => {
+    fetchRides();
+    fetchPopularRoutes();
+  }, []);
+
+  async function handleSearch(event) {
+    event.preventDefault();
+
+    await fetch("/api/ride-activity", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pickup,
+        drop,
+        seatsRequired: 1,
+      }),
+    });
+
+    await fetchRides();
+    await fetchPopularRoutes();
+  }
+
+  function handleReset() {
+    setPickup("");
+    setDrop("");
+
+    fetch("/api/rides")
+      .then((response) => response.json())
+      .then((data) => setRides(data));
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main style={{ padding: "30px", fontFamily: "Arial" }}>
+      <h1>Carpooling System</h1>
+
+      <h2>Search Available Rides</h2>
+
+      <form onSubmit={handleSearch} style={{ marginBottom: "25px" }}>
+        <input
+          placeholder="Pickup location"
+          value={pickup}
+          onChange={(event) => setPickup(event.target.value)}
+          style={{ padding: "10px", marginRight: "10px" }}
         />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.js</code> file.
-          </h1>
+
+        <input
+          placeholder="Drop location"
+          value={drop}
+          onChange={(event) => setDrop(event.target.value)}
+          style={{ padding: "10px", marginRight: "10px" }}
+        />
+
+        <button type="submit" style={{ padding: "10px" }}>
+          Search
+        </button>
+
+        <button
+          type="button"
+          onClick={handleReset}
+          style={{ padding: "10px", marginLeft: "10px" }}
+        >
+          Reset
+        </button>
+      </form>
+
+      <h2>Popular Routes</h2>
+
+      {popularRoutes.length === 0 && <p>No route activity yet.</p>}
+
+      {popularRoutes.map((route, index) => (
+        <p key={index}>
+          {route._id.pickup} → {route._id.drop} (
+          {route.searchCount} searches)
+        </p>
+      ))}
+
+      <h2>Available Rides</h2>
+
+      {rides.length === 0 && <p>No available rides found.</p>}
+
+      {rides.map((ride) => (
+        <div
+          key={ride.ride_offer_id}
+          style={{
+            border: "1px solid #ccc",
+            borderRadius: "8px",
+            padding: "16px",
+            marginBottom: "15px",
+            maxWidth: "500px",
+          }}
+        >
+          <h3>
+            {ride.pickup} → {ride.drop_location}
+          </h3>
+          <p>Driver: {ride.driver_name}</p>
           <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
+            Departure: {new Date(ride.departure_time).toLocaleString()}
           </p>
+          <p>Available seats: {ride.available_seats}</p>
+          <p>Cost per seat: ₹{ride.cost_per_seat}</p>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      ))}
+    </main>
   );
 }
