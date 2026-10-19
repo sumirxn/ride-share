@@ -56,7 +56,7 @@ CREATE TABLE RIDE_OFFER (
         REFERENCES LOCATION(location_id),
     FOREIGN KEY (drop_location_id)
         REFERENCES LOCATION(location_id),
-    CHECK (available_seats > 0),
+    CHECK (available_seats >= 0),
     CHECK (cost_per_seat >= 0),
     CHECK (pickup_location_id <> drop_location_id)
 );
