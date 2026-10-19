@@ -165,7 +165,7 @@ BEGIN
     SET available_seats = available_seats - p_seats_booked,
         status = CASE
             WHEN available_seats - p_seats_booked = 0 THEN 'FULL'
-            ELSE status
+            ELSE 'OPEN'
         END
     WHERE ride_offer_id = v_offer_id;
 
