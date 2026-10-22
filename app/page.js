@@ -8,17 +8,35 @@ export default function Home() {
   const [popularRoutes, setPopularRoutes] = useState([]);
   const [pickup, setPickup] = useState("");
   const [drop, setDrop] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  async function fetchRides() {
+
+async function fetchRides() {
+  setLoading(true);
+  setError("");
+
+  try {
     const params = new URLSearchParams({
       pickup: pickup,
       drop: drop,
     });
 
     const response = await fetch(`/api/rides?${params}`);
+
+    if (!response.ok) {
+      throw new Error("Failed to load rides");
+    }
+
     const data = await response.json();
     setRides(data);
+  } catch (error) {
+    setError("Unable to load rides. Please try again.");
+  } finally {
+    setLoading(false);
   }
+}
+
 
   async function fetchPopularRoutes() {
     const response = await fetch("/api/popular-routes");
@@ -106,30 +124,42 @@ export default function Home() {
 
       <h2>Available Rides</h2>
 
-      {rides.length === 0 && <p>No available rides found.</p>}
+      
+{loading && <p>Loading rides...</p>}
 
-      {rides.map((ride) => (
-        <div
-          key={ride.ride_offer_id}
-          style={{
-            border: "1px solid #ccc",
-            borderRadius: "8px",
-            padding: "16px",
-            marginBottom: "15px",
-            maxWidth: "500px",
-          }}
-        >
-          <h3>
-            {ride.pickup} → {ride.drop_location}
-          </h3>
-          <p>Driver: {ride.driver_name}</p>
-          <p>
-            Departure: {new Date(ride.departure_time).toLocaleString()}
-          </p>
-          <p>Available seats: {ride.available_seats}</p>
-          <p>Cost per seat: ₹{ride.cost_per_seat}</p>
-        </div>
-      ))}
+{!loading && error && (
+  <p style={{ color: "red" }}>{error}</p>
+)}
+
+{!loading && !error && rides.length === 0 && (
+  <p>No available rides found.</p>
+)}
+
+{!loading &&
+  !error &&
+  rides.map((ride) => (
+    <div
+      key={ride.ride_offer_id}
+      style={{
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        padding: "16px",
+        marginBottom: "15px",
+        maxWidth: "500px",
+      }}
+    >
+      <h3>
+        {ride.pickup} → {ride.drop_location}
+      </h3>
+      <p>Driver: {ride.driver_name}</p>
+      <p>
+        Departure: {new Date(ride.departure_time).toLocaleString()}
+      </p>
+      <p>Available seats: {ride.available_seats}</p>
+      <p>Cost per seat: ₹{ride.cost_per_seat}</p>
+    </div>
+  ))}
+
     </main>
   );
 }
