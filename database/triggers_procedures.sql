@@ -49,7 +49,7 @@ FOR EACH ROW
 BEGIN
     UPDATE `USER`
     SET rating_avg = (
-        SELECT AVG(rating_value)
+        SELECT COALESCE(ROUND(AVG(rating_value), 2), 0.00)
         FROM RATING
         WHERE rated_to = NEW.rated_to
     )
@@ -64,7 +64,7 @@ FOR EACH ROW
 BEGIN
     UPDATE `USER`
     SET rating_avg = (
-        SELECT AVG(rating_value)
+        SELECT COALESCE(ROUND(AVG(rating_value), 2), 0.00)
         FROM RATING
         WHERE rated_to = OLD.rated_to
     )
@@ -72,7 +72,7 @@ BEGIN
 
     UPDATE `USER`
     SET rating_avg = (
-        SELECT AVG(rating_value)
+        SELECT COALESCE(ROUND(AVG(rating_value), 2), 0.00)
         FROM RATING
         WHERE rated_to = NEW.rated_to
     )
@@ -87,7 +87,7 @@ FOR EACH ROW
 BEGIN
     UPDATE `USER`
     SET rating_avg = (
-        SELECT AVG(rating_value)
+        SELECT COALESCE(ROUND(AVG(rating_value), 2), 0.00)
         FROM RATING
         WHERE rated_to = OLD.rated_to
     )
@@ -96,6 +96,7 @@ END$$
 
 
 -- Create a booking and update available seats transactionally.
+
 CREATE PROCEDURE create_booking(
     IN p_match_id INT,
     IN p_trip_id INT,
@@ -103,8 +104,17 @@ CREATE PROCEDURE create_booking(
 )
 BEGIN
     DECLARE v_offer_id INT;
+    DECLARE v_request_id INT;
     DECLARE v_available_seats INT;
+    DECLARE v_offer_status VARCHAR(20);
+    DECLARE v_request_status VARCHAR(20);
+    DECLARE v_trip_offer_id INT;
     DECLARE v_booking_id INT;
+    DECLARE v_found BOOLEAN DEFAULT TRUE;
+    DECLARE v_required_seats INT;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND
+        SET v_found = FALSE;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -119,45 +129,83 @@ BEGIN
         SET MESSAGE_TEXT = 'Seats booked must be greater than zero';
     END IF;
 
-    SELECT ride_offer_id
-    INTO v_offer_id
+    SET v_found = TRUE;
+
+    SELECT ride_offer_id, ride_request_id
+    INTO v_offer_id, v_request_id
     FROM `MATCH`
     WHERE match_id = p_match_id;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM TRIP
-        WHERE trip_id = p_trip_id
-    ) THEN
+    IF v_found = FALSE THEN
         SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Trip does not exist';
+        SET MESSAGE_TEXT = 'Match not found';
     END IF;
 
-    SELECT available_seats
-    INTO v_available_seats
+    SET v_found = TRUE;
+
+    SELECT ride_offer_id
+    INTO v_trip_offer_id
+    FROM TRIP
+    WHERE trip_id = p_trip_id;
+
+    IF v_found = FALSE THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Trip not found';
+    END IF;
+
+    IF v_trip_offer_id <> v_offer_id THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Trip does not belong to matched ride offer';
+    END IF;
+
+    SET v_found = TRUE;
+
+    SELECT available_seats, status
+    INTO v_available_seats, v_offer_status
     FROM RIDE_OFFER
     WHERE ride_offer_id = v_offer_id
     FOR UPDATE;
 
-    IF v_available_seats < p_seats_booked THEN
+    IF v_found = FALSE THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ride offer not found';
+    END IF;
+
+    IF v_offer_status <> 'OPEN' THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ride offer is not open';
+    END IF;
+
+    IF p_seats_booked > v_available_seats THEN
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Not enough available seats';
     END IF;
 
-    INSERT INTO BOOKING (
-        match_id,
-        trip_id,
-        seats_booked,
-        status,
-        booked_at
-    )
-    VALUES (
-        p_match_id,
-        p_trip_id,
-        p_seats_booked,
-        'CONFIRMED',
-        CURRENT_TIMESTAMP
-    );
+    SET v_found = TRUE;
+
+    SELECT seats_required, status
+    INTO v_required_seats, v_request_status
+    FROM RIDE_REQUEST
+    WHERE ride_request_id = v_request_id
+    FOR UPDATE;
+
+    IF v_found = FALSE THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ride request not found';
+    END IF;
+
+    IF v_request_status NOT IN ('OPEN', 'MATCHED') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Ride request is not available for booking';
+    END IF;
+
+    IF p_seats_booked <> v_required_seats THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Seats booked must equal seats requested';
+    END IF;
+
+    INSERT INTO BOOKING (match_id, trip_id, seats_booked)
+    VALUES (p_match_id, p_trip_id, p_seats_booked);
 
     SET v_booking_id = LAST_INSERT_ID();
 
@@ -168,6 +216,10 @@ BEGIN
             ELSE 'OPEN'
         END
     WHERE ride_offer_id = v_offer_id;
+
+    UPDATE RIDE_REQUEST
+    SET status = 'BOOKED'
+    WHERE ride_request_id = v_request_id;
 
     COMMIT;
 
