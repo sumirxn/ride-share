@@ -280,6 +280,49 @@ a {
   gap: 16px;
 }
 
+.payment-form {
+  display: grid;
+  gap: 16px;
+}
+
+.payment-booking-summary {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--deep-teal);
+}
+
+.payment-booking-summary p {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.payment-booking-summary p span {
+  color: var(--muted);
+  font-family: "DM Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+
+.payment-booking-summary strong {
+  color: var(--sage);
+  font-size: 18px;
+}
+
+.payment-form > .booking-error {
+  margin: 0;
+}
+
+.payment-form > .primary-button {
+  justify-self: end;
+}
+
 .rating-review-field {
   grid-column: 1 / -1;
 }

@@ -48,6 +48,13 @@ export default function Home() {
   const [ratingSubmitting, setRatingSubmitting] = useState(false);
   const [ratingError, setRatingError] = useState("");
   const [ratingConfirmation, setRatingConfirmation] = useState(null);
+  const [paymentOptions, setPaymentOptions] = useState([]);
+  const [paymentOptionsLoading, setPaymentOptionsLoading] = useState(true);
+  const [paymentOptionsError, setPaymentOptionsError] = useState("");
+  const [selectedPaymentBookingId, setSelectedPaymentBookingId] = useState("");
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentConfirmation, setPaymentConfirmation] = useState(null);
 
   async function fetchRides(pickupValue = pickup, dropValue = drop) {
     setLoading(true);
@@ -133,11 +140,37 @@ export default function Home() {
     }
   }
 
+  async function fetchPaymentOptions() {
+    setPaymentOptionsLoading(true);
+    setPaymentOptionsError("");
+
+    try {
+      const response = await fetch("/api/payments");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to load eligible bookings");
+      }
+
+      setPaymentOptions(data);
+      setSelectedPaymentBookingId(
+        data.length ? String(data[0].booking_id) : ""
+      );
+    } catch (optionsError) {
+      setPaymentOptionsError(
+        optionsError.message || "Unable to load eligible bookings."
+      );
+    } finally {
+      setPaymentOptionsLoading(false);
+    }
+  }
+
   useEffect(() => {
     fetchRides("", "");
     fetchPopularRoutes();
     fetchOfferOptions();
     fetchRatingOptions();
+    fetchPaymentOptions();
   }, []);
 
   async function handleSearch(event) {
@@ -293,6 +326,47 @@ export default function Home() {
     }
   }
 
+  async function handlePaymentSubmit(event) {
+    event.preventDefault();
+    if (!selectedPaymentBookingId) return;
+
+    setPaymentSubmitting(true);
+    setPaymentError("");
+    setPaymentConfirmation(null);
+
+    try {
+      const response = await fetch("/api/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bookingId: Number(selectedPaymentBookingId),
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to process demo payment");
+      }
+
+      const remainingBookings = paymentOptions.filter(
+        (option) => String(option.booking_id) !== selectedPaymentBookingId
+      );
+      setPaymentOptions(remainingBookings);
+      setSelectedPaymentBookingId(
+        remainingBookings.length ? String(remainingBookings[0].booking_id) : ""
+      );
+      setPaymentConfirmation(data);
+    } catch (paymentRequestError) {
+      setPaymentError(
+        paymentRequestError.message || "Unable to process payment. Please try again."
+      );
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  }
+
   function selectRoute(route) {
     setPickup(route._id.pickup);
     setDrop(route._id.drop);
@@ -386,6 +460,9 @@ export default function Home() {
 
   const driverVehicles = offerOptions.vehicles.filter(
     (vehicle) => String(vehicle.owner_id) === offerForm.driverId
+  );
+  const selectedPaymentBooking = paymentOptions.find(
+    (option) => String(option.booking_id) === selectedPaymentBookingId
   );
 
   return (
@@ -764,6 +841,106 @@ export default function Home() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="search-panel payment-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">DEMO CHECKOUT</p>
+            <h2>Pay for a booking</h2>
+          </div>
+        </div>
+        <p className="rating-description">
+          Simulated payment only. No real payment gateway or charge is used.
+        </p>
+
+        {paymentOptionsLoading && (
+          <p className="booking-status">Loading eligible bookings...</p>
+        )}
+        {paymentOptionsError && (
+          <p className="error-note">{paymentOptionsError}</p>
+        )}
+        {paymentConfirmation && (
+          <p className="booking-confirmation-note" role="status">
+            Demo payment #{paymentConfirmation.paymentId} succeeded for booking #
+            {paymentConfirmation.bookingId} (₹
+            {Number(paymentConfirmation.amount).toFixed(2)}).
+          </p>
+        )}
+        {!paymentOptionsLoading &&
+          !paymentOptionsError &&
+          paymentOptions.length === 0 && (
+            <p className="empty-note">No unpaid eligible bookings are available.</p>
+          )}
+
+        {!paymentOptionsLoading &&
+          !paymentOptionsError &&
+          paymentOptions.length > 0 && (
+            <form className="payment-form" onSubmit={handlePaymentSubmit}>
+              <label className="field">
+                <span>Eligible booking</span>
+                <select
+                  required
+                  value={selectedPaymentBookingId}
+                  disabled={paymentSubmitting}
+                  onChange={(event) => {
+                    setSelectedPaymentBookingId(event.target.value);
+                    setPaymentError("");
+                    setPaymentConfirmation(null);
+                  }}
+                >
+                  {paymentOptions.map((option) => (
+                    <option key={option.booking_id} value={option.booking_id}>
+                      Booking #{option.booking_id} · {option.passenger_name} ·{" "}
+                      {option.pickup} → {option.drop_location}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {selectedPaymentBooking && (
+                <div className="payment-booking-summary">
+                  <p>
+                    <span>PASSENGER</span>
+                    {selectedPaymentBooking.passenger_name}
+                  </p>
+                  <p>
+                    <span>TRIP / SEATS</span>
+                    #{selectedPaymentBooking.trip_id} ·{" "}
+                    {selectedPaymentBooking.seats_booked}
+                  </p>
+                  <p>
+                    <span>ROUTE</span>
+                    {selectedPaymentBooking.pickup} →{" "}
+                    {selectedPaymentBooking.drop_location}
+                  </p>
+                  <p>
+                    <span>DEMO AMOUNT</span>
+                    <strong>
+                      ₹{Number(selectedPaymentBooking.amount).toFixed(2)}
+                    </strong>
+                  </p>
+                </div>
+              )}
+
+              {paymentError && (
+                <p className="booking-error" role="alert">
+                  {paymentError}
+                </p>
+              )}
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={
+                  paymentSubmitting ||
+                  !selectedPaymentBookingId ||
+                  !selectedPaymentBooking
+                }
+              >
+                {paymentSubmitting ? "Processing demo payment..." : "Pay Now"}
+              </button>
+            </form>
+          )}
       </section>
 
       <section className="search-panel rating-panel">
