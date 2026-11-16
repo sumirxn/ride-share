@@ -1,40 +1,47 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@500;600;700&family=Source+Serif+4:wght@400;500;600;700&display=swap");
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --deep-teal: #092328;
+  --forest-teal: #12544f;
+  --emerald: #2a835f;
+  --sage: #8bbb92;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-html {
-  height: 100%;
-}
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --background: #092328;
+  --surface: #0d3032;
+  --surface-raised: #103a3b;
+  --surface-hover: #12544f;
+  --foreground: #f0f4ef;
+  --muted: #a0b8ad;
+  --border: #244749;
+  --error: #ff9d9d;
 }
 
 * {
   box-sizing: border-box;
-  padding: 0;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100vh;
   margin: 0;
+  overflow-x: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Source Serif 4", Georgia, serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
 }
 
 a {
@@ -42,8 +49,764 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+.page-shell {
+  width: min(1120px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 82px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--sage);
+  color: var(--deep-teal);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.topbar-label,
+.eyebrow,
+.location-label,
+.detail-label,
+.ride-id,
+.ride-price span {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 1.3px;
+}
+
+.topbar-label {
+  color: var(--muted);
+}
+
+.hero {
+  padding: 72px 0 50px;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 13px;
+  color: var(--sage);
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: clamp(44px, 6vw, 68px);
+  font-weight: 600;
+  letter-spacing: -2px;
+  line-height: 1.1;
+}
+
+.hero-description {
+  max-width: 480px;
+  margin: 18px auto 0;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.search-panel {
+  padding: 30px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 23px;
+}
+
+.section-heading .eyebrow {
+  margin-bottom: 7px;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 27px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+}
+
+.search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 17px;
+}
+
+.field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.field > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: none;
+  background: var(--deep-teal);
+  color: var(--foreground);
+  font-size: 14px;
+  transition: border-color 150ms ease;
+}
+
+.field input::placeholder {
+  color: #78958a;
+}
+
+.field input:focus {
+  border-color: var(--sage);
+}
+
+.route-arrow {
+  align-self: center;
+  padding-top: 20px;
+  color: var(--sage);
+  font-size: 20px;
+  text-align: center;
+}
+
+.search-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 48px;
+  padding: 0 17px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--sage);
+  color: var(--deep-teal);
+  white-space: nowrap;
+}
+
+.primary-button:hover {
+  background: #a4cba9;
+  transform: translateY(-1px);
+}
+
+.secondary-button {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--foreground);
+}
+
+.secondary-button:hover {
+  border-color: var(--sage);
+  background: var(--surface-raised);
+}
+
+.content-section {
+  padding-top: 58px;
+}
+
+.popular-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.popular-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 19px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--foreground);
+  text-align: left;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.popular-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--sage);
+  background: var(--surface-raised);
+}
+
+.popular-route {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.popular-route span {
+  color: var(--sage);
+}
+
+.popular-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rides-section {
+  padding-bottom: 68px;
+}
+
+.result-count {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rides-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.ride-card {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.ride-card:hover {
+  transform: translateY(-2px);
+  border-color: #47776b;
+}
+
+.ride-card:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 3px;
+}
+
+.ride-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.available-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--sage);
+  font-size: 12px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sage);
+}
+
+.ride-id {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.route-display {
+  display: flex;
+  gap: 15px;
+  margin: 27px 0 25px;
+}
+
+.route-marker {
+  display: flex;
+  width: 12px;
+  flex: 0 0 12px;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.route-stop {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border: 2px solid var(--sage);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.end-stop {
+  border-color: var(--emerald);
+  background: var(--emerald);
+}
+
+.route-line {
+  width: 1px;
+  height: 34px;
+  border-left: 1px dashed #54756a;
+}
+
+.route-locations {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.route-location {
+  min-width: 0;
+}
+
+.location-label,
+.detail-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.route-location h3 {
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.ride-divider {
+  height: 1px;
+  background: var(--border);
+}
+
+.ride-details {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 15px;
+  padding: 19px 0;
+}
+
+.ride-details p {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--foreground);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ride-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding-top: 17px;
+  border-top: 1px solid var(--border);
+}
+
+.seat-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.seat-count span {
+  color: var(--sage);
+  font-size: 17px;
+}
+
+.ride-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.ride-price span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.ride-price strong {
+  color: var(--sage);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 27px;
+  font-weight: 600;
+}
+
+.empty-note,
+.error-note {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.error-note {
+  color: var(--error);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 0 30px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.footer-brand {
+  color: var(--foreground);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.modal-backdrop {
+  position: fixed;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(3 15 17 / 78%);
+  inset: 0;
+}
+
+.booking-modal {
+  width: min(520px, 100%);
+  max-height: min(720px, 100%);
+  overflow-y: auto;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 35%);
+}
+
+.modal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.modal-heading h2 {
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 25px;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.modal-heading h2 span {
+  color: var(--sage);
+}
+
+.modal-close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  border-color: var(--sage);
+  background: var(--surface-raised);
+}
+
+.modal-ride-details {
+  display: grid;
+  gap: 16px;
+  margin: 24px 0;
+  padding: 20px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-ride-details p {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.modal-ride-details p span,
+.seat-selector-field > span,
+.passenger-selector-field > span {
+  color: var(--muted);
+}
+
+.seat-selector-field,
+.passenger-selector-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.seat-selector-field select,
+.passenger-selector-field select {
+  min-width: 125px;
+  max-width: 65%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--deep-teal);
+  color: var(--foreground);
+}
+
+.seat-selector-field select:focus-visible,
+.passenger-selector-field select:focus-visible,
+.modal-close:focus-visible {
+  outline: 2px solid var(--sage);
+  outline-offset: 2px;
+}
+
+.seat-selector-field select:disabled,
+.passenger-selector-field select:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.modal-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.modal-total span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.modal-total strong {
+  color: var(--sage);
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 27px;
+}
+
+.booking-error,
+.booking-status {
+  margin: 18px 0 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--deep-teal);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.booking-error {
+  border-left: 3px solid var(--error);
+  color: var(--error);
+}
+
+.booking-status {
+  color: var(--muted);
+}
+
+.booking-confirmation {
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--deep-teal);
+  text-align: center;
+}
+
+.booking-confirmation p {
+  margin: 0 0 8px;
+  color: var(--sage);
+  font-size: 16px;
+}
+
+.booking-confirmation strong {
+  display: block;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.modal-book-button {
+  width: 100%;
+}
+
+.modal-book-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+  .search-form {
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  }
+
+  .search-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .popular-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .page-shell {
+    width: calc(100% - 32px);
+  }
+
+  .topbar {
+    min-height: 70px;
+  }
+
+  .brand {
+    font-size: 20px;
+  }
+
+  .topbar-label {
+    max-width: 130px;
+    font-size: 8px;
+    text-align: right;
+  }
+
+  .hero {
+    padding: 54px 0 36px;
+  }
+
+  .hero h1 {
+    font-size: 48px;
+  }
+
+  .hero-description {
+    max-width: 340px;
+    font-size: 15px;
+  }
+
+  .search-panel {
+    padding: 21px 17px;
+  }
+
+  .section-heading h2 {
+    font-size: 24px;
+  }
+
+  .search-form {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 15px;
+  }
+
+  .route-arrow {
+    display: none;
+  }
+
+  .search-actions {
+    grid-column: auto;
+    justify-content: stretch;
+  }
+
+  .primary-button {
+    flex: 1;
+  }
+
+  .popular-grid,
+  .rides-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .content-section {
+    padding-top: 43px;
+  }
+
+  .ride-card {
+    padding: 20px;
+  }
+
+  .booking-modal {
+    padding: 22px 18px;
+  }
+
+  .ride-details {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
 }
