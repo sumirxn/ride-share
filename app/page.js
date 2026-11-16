@@ -18,6 +18,25 @@ export default function Home() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingConfirmation, setBookingConfirmation] = useState(null);
+  const [offerOptions, setOfferOptions] = useState({
+    drivers: [],
+    vehicles: [],
+    locations: [],
+  });
+  const [offerOptionsLoading, setOfferOptionsLoading] = useState(true);
+  const [offerOptionsError, setOfferOptionsError] = useState("");
+  const [offerForm, setOfferForm] = useState({
+    driverId: "",
+    vehicleId: "",
+    pickupLocationId: "",
+    dropLocationId: "",
+    departureTime: "",
+    availableSeats: "1",
+    costPerSeat: "",
+  });
+  const [offerSubmitting, setOfferSubmitting] = useState(false);
+  const [offerError, setOfferError] = useState("");
+  const [offerConfirmation, setOfferConfirmation] = useState(null);
 
   async function fetchRides(pickupValue = pickup, dropValue = drop) {
     setLoading(true);
@@ -59,9 +78,32 @@ export default function Home() {
     }
   }
 
+  async function fetchOfferOptions() {
+    setOfferOptionsLoading(true);
+    setOfferOptionsError("");
+
+    try {
+      const response = await fetch("/api/ride-offers");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to load ride offer options");
+      }
+
+      setOfferOptions(data);
+    } catch (optionsError) {
+      setOfferOptionsError(
+        optionsError.message || "Unable to load drivers, vehicles and locations."
+      );
+    } finally {
+      setOfferOptionsLoading(false);
+    }
+  }
+
   useEffect(() => {
     fetchRides("", "");
     fetchPopularRoutes();
+    fetchOfferOptions();
   }, []);
 
   async function handleSearch(event) {
@@ -91,6 +133,64 @@ export default function Home() {
     setPickup("");
     setDrop("");
     await fetchRides("", "");
+  }
+
+  function handleOfferFieldChange(event) {
+    const { name, value } = event.target;
+    setOfferForm((current) => ({
+      ...current,
+      [name]: value,
+      ...(name === "driverId" ? { vehicleId: "" } : {}),
+    }));
+    setOfferError("");
+    setOfferConfirmation(null);
+  }
+
+  async function handleOfferSubmit(event) {
+    event.preventDefault();
+    setOfferSubmitting(true);
+    setOfferError("");
+    setOfferConfirmation(null);
+
+    try {
+      const response = await fetch("/api/ride-offers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          driverId: Number(offerForm.driverId),
+          vehicleId: Number(offerForm.vehicleId),
+          pickupLocationId: Number(offerForm.pickupLocationId),
+          dropLocationId: Number(offerForm.dropLocationId),
+          departureTime: offerForm.departureTime,
+          availableSeats: Number(offerForm.availableSeats),
+          costPerSeat: offerForm.costPerSeat,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to create ride offer");
+      }
+
+      setOfferConfirmation(data);
+      setOfferForm((current) => ({
+        ...current,
+        pickupLocationId: "",
+        dropLocationId: "",
+        departureTime: "",
+        availableSeats: "1",
+        costPerSeat: "",
+      }));
+      await fetchRides(pickup, drop);
+    } catch (offerRequestError) {
+      setOfferError(
+        offerRequestError.message || "Unable to create ride offer. Please try again."
+      );
+    } finally {
+      setOfferSubmitting(false);
+    }
   }
 
   function selectRoute(route) {
@@ -184,6 +284,10 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [selectedRide, bookingLoading]);
 
+  const driverVehicles = offerOptions.vehicles.filter(
+    (vehicle) => String(vehicle.owner_id) === offerForm.driverId
+  );
+
   return (
     <main className="page-shell">
       <header className="topbar">
@@ -248,6 +352,179 @@ export default function Home() {
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="search-panel offer-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">DRIVER</p>
+            <h2>Offer a ride</h2>
+          </div>
+        </div>
+
+        {offerOptionsLoading && (
+          <p className="booking-status">Loading drivers, vehicles and locations...</p>
+        )}
+        {offerOptionsError && <p className="error-note">{offerOptionsError}</p>}
+
+        {!offerOptionsLoading && !offerOptionsError && (
+          <form className="offer-form" onSubmit={handleOfferSubmit}>
+            <label className="field">
+              <span>Driver</span>
+              <select
+                name="driverId"
+                required
+                value={offerForm.driverId}
+                onChange={handleOfferFieldChange}
+              >
+                <option value="">Select an active user</option>
+                {offerOptions.drivers.map((driver) => (
+                  <option key={driver.user_id} value={driver.user_id}>
+                    {driver.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Vehicle</span>
+              <select
+                name="vehicleId"
+                required
+                value={offerForm.vehicleId}
+                onChange={handleOfferFieldChange}
+                disabled={!offerForm.driverId || driverVehicles.length === 0}
+              >
+                <option value="">
+                  {offerForm.driverId
+                    ? "Select one of your vehicles"
+                    : "Select a driver first"}
+                </option>
+                {driverVehicles.map((vehicle) => (
+                  <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>
+                    {vehicle.license_plate} · {vehicle.vehicle_type} (
+                    {vehicle.seating_capacity} seats)
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Pickup location</span>
+              <select
+                name="pickupLocationId"
+                required
+                value={offerForm.pickupLocationId}
+                onChange={handleOfferFieldChange}
+              >
+                <option value="">Select pickup</option>
+                {offerOptions.locations.map((location) => (
+                  <option key={location.location_id} value={location.location_id}>
+                    {location.name} · {location.city}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Drop location</span>
+              <select
+                name="dropLocationId"
+                required
+                value={offerForm.dropLocationId}
+                onChange={handleOfferFieldChange}
+              >
+                <option value="">Select drop</option>
+                {offerOptions.locations.map((location) => (
+                  <option key={location.location_id} value={location.location_id}>
+                    {location.name} · {location.city}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="field">
+              <span>Departure date and time</span>
+              <input
+                type="datetime-local"
+                name="departureTime"
+                required
+                value={offerForm.departureTime}
+                onChange={handleOfferFieldChange}
+              />
+            </label>
+
+            <label className="field">
+              <span>Available seats</span>
+              <input
+                type="number"
+                name="availableSeats"
+                min="1"
+                max={
+                  driverVehicles.find(
+                    (vehicle) =>
+                      String(vehicle.vehicle_id) === offerForm.vehicleId
+                  )?.seating_capacity
+                }
+                step="1"
+                required
+                value={offerForm.availableSeats}
+                onChange={handleOfferFieldChange}
+              />
+            </label>
+
+            <label className="field">
+              <span>Cost per seat (₹)</span>
+              <input
+                type="number"
+                name="costPerSeat"
+                min="0"
+                max="99999999.99"
+                step="0.01"
+                required
+                value={offerForm.costPerSeat}
+                onChange={handleOfferFieldChange}
+              />
+            </label>
+
+            <div className="offer-submit-row">
+              {offerOptions.drivers.length === 0 && (
+                <p className="booking-error">
+                  No active users are available to offer rides.
+                </p>
+              )}
+              {offerForm.driverId && driverVehicles.length === 0 && (
+                <p className="booking-error">
+                  This active user has no registered vehicles.
+                </p>
+              )}
+              {offerError && (
+                <p className="booking-error" role="alert">
+                  {offerError}
+                </p>
+              )}
+              {offerConfirmation && (
+                <p className="booking-confirmation-note" role="status">
+                  Ride offer #{offerConfirmation.rideOfferId} created with trip #
+                  {offerConfirmation.tripId}.
+                </p>
+              )}
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={
+                  offerSubmitting ||
+                  offerOptions.drivers.length === 0 ||
+                  offerOptions.locations.length < 2 ||
+                  !offerForm.driverId ||
+                  driverVehicles.length === 0
+                }
+              >
+                {offerSubmitting ? "Creating offer..." : "Offer Ride"}
+              </button>
+            </div>
+          </form>
+        )}
       </section>
 
       <section className="content-section">

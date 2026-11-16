@@ -188,6 +188,28 @@ a {
   transition: border-color 150ms ease;
 }
 
+.field select {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: none;
+  background: var(--deep-teal);
+  color: var(--foreground);
+  font-size: 14px;
+}
+
+.field select:focus,
+.field select:focus-visible {
+  border-color: var(--sage);
+}
+
+.field select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .field input::placeholder {
   color: #78958a;
 }
@@ -208,6 +230,37 @@ a {
   display: flex;
   align-items: center;
   gap: 9px;
+}
+
+.offer-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 17px;
+}
+
+.offer-submit-row {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.offer-submit-row > .primary-button {
+  align-self: flex-end;
+}
+
+.booking-confirmation-note {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--sage);
+  border-radius: 6px;
+  background: var(--deep-teal);
+  color: var(--sage);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .primary-button,
@@ -767,6 +820,15 @@ a {
   .search-form {
     grid-template-columns: minmax(0, 1fr);
     gap: 15px;
+  }
+
+  .offer-form {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 15px;
+  }
+
+  .offer-submit-row {
+    grid-column: auto;
   }
 
   .route-arrow {
