@@ -263,6 +263,58 @@ a {
   line-height: 1.6;
 }
 
+.rating-panel {
+  margin-bottom: 68px;
+}
+
+.rating-description {
+  margin: -7px 0 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.rating-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+}
+
+.rating-review-field {
+  grid-column: 1 / -1;
+}
+
+.rating-review-field textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: none;
+  background: var(--deep-teal);
+  color: var(--foreground);
+  font-size: 14px;
+  resize: vertical;
+}
+
+.rating-review-field textarea::placeholder {
+  color: #78958a;
+}
+
+.rating-review-field textarea:focus {
+  border-color: var(--sage);
+}
+
+.rating-form > .booking-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.rating-form > .primary-button {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
 .primary-button,
 .secondary-button {
   min-height: 48px;
@@ -825,6 +877,16 @@ a {
   .offer-form {
     grid-template-columns: minmax(0, 1fr);
     gap: 15px;
+  }
+
+  .rating-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rating-review-field,
+  .rating-form > .booking-error,
+  .rating-form > .primary-button {
+    grid-column: auto;
   }
 
   .offer-submit-row {

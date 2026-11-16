@@ -37,6 +37,17 @@ export default function Home() {
   const [offerSubmitting, setOfferSubmitting] = useState(false);
   const [offerError, setOfferError] = useState("");
   const [offerConfirmation, setOfferConfirmation] = useState(null);
+  const [ratingOptions, setRatingOptions] = useState([]);
+  const [ratingOptionsLoading, setRatingOptionsLoading] = useState(true);
+  const [ratingOptionsError, setRatingOptionsError] = useState("");
+  const [ratingForm, setRatingForm] = useState({
+    optionKey: "",
+    ratingValue: "5",
+    review: "",
+  });
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [ratingError, setRatingError] = useState("");
+  const [ratingConfirmation, setRatingConfirmation] = useState(null);
 
   async function fetchRides(pickupValue = pickup, dropValue = drop) {
     setLoading(true);
@@ -100,10 +111,33 @@ export default function Home() {
     }
   }
 
+  async function fetchRatingOptions() {
+    setRatingOptionsLoading(true);
+    setRatingOptionsError("");
+
+    try {
+      const response = await fetch("/api/ratings");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to load rating options");
+      }
+
+      setRatingOptions(data);
+    } catch (optionsError) {
+      setRatingOptionsError(
+        optionsError.message || "Unable to load completed trip participants."
+      );
+    } finally {
+      setRatingOptionsLoading(false);
+    }
+  }
+
   useEffect(() => {
     fetchRides("", "");
     fetchPopularRoutes();
     fetchOfferOptions();
+    fetchRatingOptions();
   }, []);
 
   async function handleSearch(event) {
@@ -190,6 +224,72 @@ export default function Home() {
       );
     } finally {
       setOfferSubmitting(false);
+    }
+  }
+
+  function getRatingOptionKey(option) {
+    return `${option.trip_id}:${option.rated_by_id}:${option.rated_to_id}`;
+  }
+
+  function handleRatingFieldChange(event) {
+    const { name, value } = event.target;
+    setRatingForm((current) => ({ ...current, [name]: value }));
+    setRatingError("");
+    setRatingConfirmation(null);
+  }
+
+  async function handleRatingSubmit(event) {
+    event.preventDefault();
+    const selectedOption = ratingOptions.find(
+      (option) => getRatingOptionKey(option) === ratingForm.optionKey
+    );
+
+    if (!selectedOption) {
+      setRatingError("Select a completed trip and participant to rate.");
+      return;
+    }
+
+    setRatingSubmitting(true);
+    setRatingError("");
+    setRatingConfirmation(null);
+
+    try {
+      const response = await fetch("/api/ratings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tripId: Number(selectedOption.trip_id),
+          ratedById: Number(selectedOption.rated_by_id),
+          ratedToId: Number(selectedOption.rated_to_id),
+          ratingValue: Number(ratingForm.ratingValue),
+          review: ratingForm.review,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to submit rating");
+      }
+
+      setRatingConfirmation(data);
+      setRatingOptions((current) =>
+        current.filter(
+          (option) => getRatingOptionKey(option) !== ratingForm.optionKey
+        )
+      );
+      setRatingForm((current) => ({
+        ...current,
+        optionKey: "",
+        review: "",
+      }));
+    } catch (ratingRequestError) {
+      setRatingError(
+        ratingRequestError.message || "Unable to submit rating. Please try again."
+      );
+    } finally {
+      setRatingSubmitting(false);
     }
   }
 
@@ -664,6 +764,107 @@ export default function Home() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="search-panel rating-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">YOUR FEEDBACK</p>
+            <h2>Rate a ride participant</h2>
+          </div>
+        </div>
+        <p className="rating-description">
+          Ratings are available for active participants on completed rides.
+        </p>
+
+        {ratingOptionsLoading && (
+          <p className="booking-status">Loading completed rides...</p>
+        )}
+        {ratingOptionsError && (
+          <p className="error-note">{ratingOptionsError}</p>
+        )}
+        {ratingConfirmation && (
+          <p className="booking-confirmation-note" role="status">
+            Rating #{ratingConfirmation.ratingId} submitted successfully.
+          </p>
+        )}
+
+        {!ratingOptionsLoading &&
+          !ratingOptionsError &&
+          ratingOptions.length === 0 && (
+            <p className="empty-note">
+              No unrated completed ride participants are available.
+            </p>
+          )}
+
+        {!ratingOptionsLoading &&
+          !ratingOptionsError &&
+          ratingOptions.length > 0 && (
+            <form className="rating-form" onSubmit={handleRatingSubmit}>
+              <label className="field">
+                <span>Completed trip and participant</span>
+                <select
+                  name="optionKey"
+                  required
+                  value={ratingForm.optionKey}
+                  onChange={handleRatingFieldChange}
+                >
+                  <option value="">Select a completed trip</option>
+                  {ratingOptions.map((option) => (
+                    <option
+                      key={getRatingOptionKey(option)}
+                      value={getRatingOptionKey(option)}
+                    >
+                      Trip #{option.trip_id} · {option.rated_by_name} rates{" "}
+                      {option.rated_to_name} · {option.pickup} →{" "}
+                      {option.drop_location}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Rating</span>
+                <select
+                  name="ratingValue"
+                  required
+                  value={ratingForm.ratingValue}
+                  onChange={handleRatingFieldChange}
+                >
+                  {[5, 4, 3, 2, 1].map((value) => (
+                    <option key={value} value={value}>
+                      {value} {value === 1 ? "star" : "stars"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="field rating-review-field">
+                <span>Review (optional)</span>
+                <textarea
+                  name="review"
+                  maxLength={2000}
+                  rows={3}
+                  value={ratingForm.review}
+                  onChange={handleRatingFieldChange}
+                  placeholder="Share a few words about the ride"
+                />
+              </label>
+
+              {ratingError && (
+                <p className="booking-error" role="alert">
+                  {ratingError}
+                </p>
+              )}
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={ratingSubmitting || !ratingForm.optionKey}
+              >
+                {ratingSubmitting ? "Submitting rating..." : "Submit Rating"}
+              </button>
+            </form>
+          )}
       </section>
 
       <footer className="footer">
