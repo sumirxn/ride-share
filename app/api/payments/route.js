@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { authorizeRequest } from "@/lib/api-auth";
 
 class PaymentError extends Error {
   constructor(message, status) {
@@ -39,13 +40,17 @@ const paymentBookingSelect = `
 
 const paymentStatusesThatBlockAnotherPayment = ["PENDING", "PAID"];
 
-export async function GET() {
+export async function GET(request) {
+  const authorization = await authorizeRequest(request, ["PASSENGER"]);
+  if (authorization.response) return authorization.response;
+
   try {
-    const [bookings] = await pool.query(`
+    const [bookings] = await pool.execute(`
       ${paymentBookingSelect}
       WHERE b.status IN ('CONFIRMED', 'COMPLETED')
         AND t.status <> 'CANCELLED'
         AND passenger.is_active = TRUE
+        AND rr.user_id = ?
         AND NOT EXISTS (
           SELECT 1
           FROM PAYMENT existing_payment
@@ -53,7 +58,7 @@ export async function GET() {
             AND existing_payment.payment_status IN ('PENDING', 'PAID')
         )
       ORDER BY b.booked_at DESC
-    `);
+    `, [authorization.user.user_id]);
 
     return NextResponse.json(bookings);
   } catch (error) {
@@ -66,6 +71,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const authorization = await authorizeRequest(request, ["PASSENGER"]);
+  if (authorization.response) return authorization.response;
+
   let connection;
   let transactionOpen = false;
 
@@ -96,6 +104,9 @@ export async function POST(request) {
     const booking = bookings[0];
     if (!booking) {
       throw new PaymentError("Booking was not found", 404);
+    }
+    if (Number(booking.passenger_id) !== Number(authorization.user.user_id)) {
+      throw new PaymentError("You cannot pay for another user's booking", 403);
     }
 
     if (!["CONFIRMED", "COMPLETED"].includes(booking.booking_status)) {
@@ -141,7 +152,7 @@ export async function POST(request) {
       `INSERT INTO PAYMENT
         (booking_id, paid_by, amount, payment_status, paid_at)
        VALUES (?, ?, ?, 'PAID', CURRENT_TIMESTAMP)`,
-      [bookingId, booking.passenger_id, booking.amount]
+      [bookingId, authorization.user.user_id, booking.amount]
     );
 
     await connection.commit();

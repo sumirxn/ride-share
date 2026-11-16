@@ -1,42 +1,26 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function Home() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [rides, setRides] = useState([]);
   const [popularRoutes, setPopularRoutes] = useState([]);
+  const [popularRoutesError, setPopularRoutesError] = useState("");
   const [pickup, setPickup] = useState("");
   const [drop, setDrop] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedRide, setSelectedRide] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState(1);
-  const [passengers, setPassengers] = useState([]);
-  const [passengerLoading, setPassengerLoading] = useState(false);
-  const [passengerError, setPassengerError] = useState("");
-  const [selectedPassengerId, setSelectedPassengerId] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingConfirmation, setBookingConfirmation] = useState(null);
-  const [offerOptions, setOfferOptions] = useState({
-    drivers: [],
-    vehicles: [],
-    locations: [],
-  });
-  const [offerOptionsLoading, setOfferOptionsLoading] = useState(true);
-  const [offerOptionsError, setOfferOptionsError] = useState("");
-  const [offerForm, setOfferForm] = useState({
-    driverId: "",
-    vehicleId: "",
-    pickupLocationId: "",
-    dropLocationId: "",
-    departureTime: "",
-    availableSeats: "1",
-    costPerSeat: "",
-  });
-  const [offerSubmitting, setOfferSubmitting] = useState(false);
-  const [offerError, setOfferError] = useState("");
-  const [offerConfirmation, setOfferConfirmation] = useState(null);
+  const [locations, setLocations] = useState([]);
+  const [locationsLoading, setLocationsLoading] = useState(true);
+  const [locationsError, setLocationsError] = useState("");
   const [ratingOptions, setRatingOptions] = useState([]);
   const [ratingOptionsLoading, setRatingOptionsLoading] = useState(true);
   const [ratingOptionsError, setRatingOptionsError] = useState("");
@@ -55,8 +39,58 @@ export default function Home() {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [paymentConfirmation, setPaymentConfirmation] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [rideRequests, setRideRequests] = useState([]);
+  const [userDataError, setUserDataError] = useState("");
+  const [requestForm, setRequestForm] = useState({
+    pickupLocationId: "",
+    dropLocationId: "",
+    requestedTime: "",
+    seatsRequired: "1",
+    maxDetourMinutes: "0",
+  });
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestError, setRequestError] = useState("");
+  const [requestConfirmation, setRequestConfirmation] = useState(null);
+  const [cancellingBookingId, setCancellingBookingId] = useState(null);
+  const [cancellationError, setCancellationError] = useState("");
 
-  async function fetchRides(pickupValue = pickup, dropValue = drop) {
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/me")
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          window.location.replace("/login");
+          return;
+        }
+        if (!active) return;
+        if (data.user.role !== "PASSENGER") {
+          window.location.replace(data.user.role === "ADMIN" ? "/admin" : "/driver");
+          return;
+        }
+        setCurrentUser(data.user);
+        void fetchPopularRoutes();
+        await Promise.all([
+          fetchRides("", ""),
+          fetchLocations(),
+          fetchRatingOptions(),
+          fetchPaymentOptions(),
+          fetchUserData(),
+        ]);
+      })
+      .catch(() => {
+        window.location.replace("/login");
+      })
+      .finally(() => {
+        if (active) setAuthLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function fetchRides(pickupValue, dropValue) {
     setLoading(true);
     setError("");
 
@@ -82,6 +116,7 @@ export default function Home() {
   }
 
   async function fetchPopularRoutes() {
+    setPopularRoutesError("");
     try {
       const response = await fetch("/api/popular-routes");
 
@@ -93,28 +128,27 @@ export default function Home() {
       setPopularRoutes(data);
     } catch {
       setPopularRoutes([]);
+      setPopularRoutesError("Popular-route analytics are temporarily unavailable.");
     }
   }
 
-  async function fetchOfferOptions() {
-    setOfferOptionsLoading(true);
-    setOfferOptionsError("");
+  async function fetchLocations() {
+    setLocationsLoading(true);
+    setLocationsError("");
 
     try {
-      const response = await fetch("/api/ride-offers");
+      const response = await fetch("/api/locations");
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to load ride offer options");
+        throw new Error(data.message || "Failed to load locations");
       }
 
-      setOfferOptions(data);
+      setLocations(data);
     } catch (optionsError) {
-      setOfferOptionsError(
-        optionsError.message || "Unable to load drivers, vehicles and locations."
-      );
+      setLocationsError(optionsError.message || "Unable to load locations.");
     } finally {
-      setOfferOptionsLoading(false);
+      setLocationsLoading(false);
     }
   }
 
@@ -165,19 +199,31 @@ export default function Home() {
     }
   }
 
-  useEffect(() => {
-    fetchRides("", "");
-    fetchPopularRoutes();
-    fetchOfferOptions();
-    fetchRatingOptions();
-    fetchPaymentOptions();
-  }, []);
+  async function fetchUserData() {
+    setUserDataError("");
+    try {
+      const [bookingResponse, requestResponse] = await Promise.all([
+        fetch("/api/bookings"),
+        fetch("/api/ride-requests"),
+      ]);
+      const [bookingData, requestData] = await Promise.all([
+        bookingResponse.json(),
+        requestResponse.json(),
+      ]);
+      if (!bookingResponse.ok || !requestResponse.ok) {
+        throw new Error("Unable to load your ride information");
+      }
+      setBookings(bookingData);
+      setRideRequests(requestData);
+    } catch (error) {
+      setUserDataError(error.message || "Unable to load your ride information.");
+    }
+  }
 
   async function handleSearch(event) {
     event.preventDefault();
 
-    try {
-      await fetch("/api/ride-activity", {
+    void fetch("/api/ride-activity", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -187,77 +233,17 @@ export default function Home() {
           drop: drop.trim(),
           seatsRequired: 1,
         }),
+      }).catch(() => {
+        // Ride search can continue if activity logging is unavailable.
       });
-    } catch {
-      // Ride search can continue if activity logging is unavailable.
-    }
-
     await fetchRides(pickup, drop);
-    await fetchPopularRoutes();
+    void fetchPopularRoutes();
   }
 
   async function handleReset() {
     setPickup("");
     setDrop("");
     await fetchRides("", "");
-  }
-
-  function handleOfferFieldChange(event) {
-    const { name, value } = event.target;
-    setOfferForm((current) => ({
-      ...current,
-      [name]: value,
-      ...(name === "driverId" ? { vehicleId: "" } : {}),
-    }));
-    setOfferError("");
-    setOfferConfirmation(null);
-  }
-
-  async function handleOfferSubmit(event) {
-    event.preventDefault();
-    setOfferSubmitting(true);
-    setOfferError("");
-    setOfferConfirmation(null);
-
-    try {
-      const response = await fetch("/api/ride-offers", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          driverId: Number(offerForm.driverId),
-          vehicleId: Number(offerForm.vehicleId),
-          pickupLocationId: Number(offerForm.pickupLocationId),
-          dropLocationId: Number(offerForm.dropLocationId),
-          departureTime: offerForm.departureTime,
-          availableSeats: Number(offerForm.availableSeats),
-          costPerSeat: offerForm.costPerSeat,
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to create ride offer");
-      }
-
-      setOfferConfirmation(data);
-      setOfferForm((current) => ({
-        ...current,
-        pickupLocationId: "",
-        dropLocationId: "",
-        departureTime: "",
-        availableSeats: "1",
-        costPerSeat: "",
-      }));
-      await fetchRides(pickup, drop);
-    } catch (offerRequestError) {
-      setOfferError(
-        offerRequestError.message || "Unable to create ride offer. Please try again."
-      );
-    } finally {
-      setOfferSubmitting(false);
-    }
   }
 
   function getRatingOptionKey(option) {
@@ -294,7 +280,6 @@ export default function Home() {
         },
         body: JSON.stringify({
           tripId: Number(selectedOption.trip_id),
-          ratedById: Number(selectedOption.rated_by_id),
           ratedToId: Number(selectedOption.rated_to_id),
           ratingValue: Number(ratingForm.ratingValue),
           review: ratingForm.review,
@@ -375,30 +360,8 @@ export default function Home() {
   async function openRide(ride) {
     setSelectedRide(ride);
     setSelectedSeats(1);
-    setPassengers([]);
-    setSelectedPassengerId("");
-    setPassengerError("");
     setBookingError("");
     setBookingConfirmation(null);
-    setPassengerLoading(true);
-
-    try {
-      const response = await fetch("/api/passengers");
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to load passengers");
-      }
-
-      setPassengers(data);
-      setSelectedPassengerId(data.length ? String(data[0].user_id) : "");
-    } catch (passengerLoadError) {
-      setPassengerError(
-        passengerLoadError.message || "Unable to load active passengers."
-      );
-    } finally {
-      setPassengerLoading(false);
-    }
   }
 
   function closeRideModal() {
@@ -409,7 +372,7 @@ export default function Home() {
   }
 
   async function handleBooking() {
-    if (!selectedRide || !selectedPassengerId) return;
+    if (!selectedRide) return;
 
     setBookingLoading(true);
     setBookingError("");
@@ -421,7 +384,6 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          passengerId: Number(selectedPassengerId),
           rideOfferId: Number(selectedRide.ride_offer_id),
           seatsBooked: selectedSeats,
         }),
@@ -434,6 +396,7 @@ export default function Home() {
 
       setBookingConfirmation(data);
       await fetchRides(pickup, drop);
+      await fetchUserData();
     } catch (bookingRequestError) {
       setBookingError(
         bookingRequestError.message || "Unable to book this ride. Please try again."
@@ -458,21 +421,92 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [selectedRide, bookingLoading]);
 
-  const driverVehicles = offerOptions.vehicles.filter(
-    (vehicle) => String(vehicle.owner_id) === offerForm.driverId
-  );
   const selectedPaymentBooking = paymentOptions.find(
     (option) => String(option.booking_id) === selectedPaymentBookingId
   );
 
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.replace("/login");
+  }
+
+  async function handleRequestSubmit(event) {
+    event.preventDefault();
+    setRequestSubmitting(true);
+    setRequestError("");
+    setRequestConfirmation(null);
+    try {
+      const response = await fetch("/api/ride-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...requestForm,
+          pickupLocationId: Number(requestForm.pickupLocationId),
+          dropLocationId: Number(requestForm.dropLocationId),
+          seatsRequired: Number(requestForm.seatsRequired),
+          maxDetourMinutes: Number(requestForm.maxDetourMinutes),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to request a ride");
+      }
+
+      async function handleCancelBooking(bookingId) {
+        setCancellingBookingId(bookingId);
+        setCancellationError("");
+        try {
+          const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: "Cancelled by passenger" }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.message || "Unable to cancel booking");
+          await Promise.all([fetchUserData(), fetchPaymentOptions()]);
+        } catch (error) {
+          setCancellationError(error.message || "Unable to cancel booking");
+        } finally {
+          setCancellingBookingId(null);
+        }
+      }
+      setRequestConfirmation(data);
+      setRequestForm((value) => ({
+        ...value,
+        pickupLocationId: "",
+        dropLocationId: "",
+        requestedTime: "",
+      }));
+      await fetchUserData();
+    } catch (error) {
+      setRequestError(error.message || "Unable to request a ride");
+    } finally {
+      setRequestSubmitting(false);
+    }
+  }
+
+  if (authLoading || !currentUser) {
+    return (
+      <main className="page-shell">
+        <p className="booking-status">Checking your account...</p>
+      </main>
+    );
+  }
+
   return (
     <main className="page-shell">
       <header className="topbar">
-        <a className="brand" href="/">
+        <Link className="brand" href="/">
           <span className="brand-mark">R</span>
           <span>RideShare</span>
-        </a>
+        </Link>
         <span className="topbar-label">CARPOOLING &amp; RIDE MATCHING</span>
+        <div className="account-actions">
+          <span>{currentUser.name} · {currentUser.role}</span>
+          <button type="button" className="secondary-button" onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
       </header>
 
       <section className="hero">
@@ -531,177 +565,170 @@ export default function Home() {
         </form>
       </section>
 
-      <section className="search-panel offer-panel">
+      <section className="search-panel request-panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">DRIVER</p>
-            <h2>Offer a ride</h2>
+            <p className="eyebrow">PASSENGER</p>
+            <h2>Request a ride</h2>
           </div>
         </div>
-
-        {offerOptionsLoading && (
-          <p className="booking-status">Loading drivers, vehicles and locations...</p>
-        )}
-        {offerOptionsError && <p className="error-note">{offerOptionsError}</p>}
-
-        {!offerOptionsLoading && !offerOptionsError && (
-          <form className="offer-form" onSubmit={handleOfferSubmit}>
-            <label className="field">
-              <span>Driver</span>
-              <select
-                name="driverId"
-                required
-                value={offerForm.driverId}
-                onChange={handleOfferFieldChange}
-              >
-                <option value="">Select an active user</option>
-                {offerOptions.drivers.map((driver) => (
-                  <option key={driver.user_id} value={driver.user_id}>
-                    {driver.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              <span>Vehicle</span>
-              <select
-                name="vehicleId"
-                required
-                value={offerForm.vehicleId}
-                onChange={handleOfferFieldChange}
-                disabled={!offerForm.driverId || driverVehicles.length === 0}
-              >
-                <option value="">
-                  {offerForm.driverId
-                    ? "Select one of your vehicles"
-                    : "Select a driver first"}
+        {locationsLoading && <p className="booking-status">Loading locations...</p>}
+        {locationsError && <p className="error-note">{locationsError}</p>}
+        <form className="offer-form" onSubmit={handleRequestSubmit}>
+          <label className="field">
+            <span>Pickup location</span>
+            <select
+              required
+              value={requestForm.pickupLocationId}
+              onChange={(event) =>
+                setRequestForm((value) => ({
+                  ...value,
+                  pickupLocationId: event.target.value,
+                }))
+              }
+            >
+              <option value="">Select pickup</option>
+              {locations.map((location) => (
+                <option key={location.location_id} value={location.location_id}>
+                  {location.name} · {location.city}
                 </option>
-                {driverVehicles.map((vehicle) => (
-                  <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>
-                    {vehicle.license_plate} · {vehicle.vehicle_type} (
-                    {vehicle.seating_capacity} seats)
-                  </option>
-                ))}
-              </select>
-            </label>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Drop location</span>
+            <select
+              required
+              value={requestForm.dropLocationId}
+              onChange={(event) =>
+                setRequestForm((value) => ({
+                  ...value,
+                  dropLocationId: event.target.value,
+                }))
+              }
+            >
+              <option value="">Select drop</option>
+              {locations.map((location) => (
+                <option key={location.location_id} value={location.location_id}>
+                  {location.name} · {location.city}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Requested date and time</span>
+            <input
+              type="datetime-local"
+              required
+              value={requestForm.requestedTime}
+              onChange={(event) =>
+                setRequestForm((value) => ({
+                  ...value,
+                  requestedTime: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Seats required</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              required
+              value={requestForm.seatsRequired}
+              onChange={(event) =>
+                setRequestForm((value) => ({
+                  ...value,
+                  seatsRequired: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Maximum detour (minutes)</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={requestForm.maxDetourMinutes}
+              onChange={(event) =>
+                setRequestForm((value) => ({
+                  ...value,
+                  maxDetourMinutes: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <div className="offer-submit-row">
+            {requestError && <p className="booking-error" role="alert">{requestError}</p>}
+            {requestConfirmation && (
+              <p className="booking-confirmation-note" role="status">
+                Ride request #{requestConfirmation.rideRequestId} created.
+              </p>
+            )}
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={requestSubmitting || locations.length < 2}
+            >
+              {requestSubmitting ? "Submitting request..." : "Request Ride"}
+            </button>
+          </div>
+        </form>
+      </section>
 
-            <label className="field">
-              <span>Pickup location</span>
-              <select
-                name="pickupLocationId"
-                required
-                value={offerForm.pickupLocationId}
-                onChange={handleOfferFieldChange}
-              >
-                <option value="">Select pickup</option>
-                {offerOptions.locations.map((location) => (
-                  <option key={location.location_id} value={location.location_id}>
-                    {location.name} · {location.city}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              <span>Drop location</span>
-              <select
-                name="dropLocationId"
-                required
-                value={offerForm.dropLocationId}
-                onChange={handleOfferFieldChange}
-              >
-                <option value="">Select drop</option>
-                {offerOptions.locations.map((location) => (
-                  <option key={location.location_id} value={location.location_id}>
-                    {location.name} · {location.city}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="field">
-              <span>Departure date and time</span>
-              <input
-                type="datetime-local"
-                name="departureTime"
-                required
-                value={offerForm.departureTime}
-                onChange={handleOfferFieldChange}
-              />
-            </label>
-
-            <label className="field">
-              <span>Available seats</span>
-              <input
-                type="number"
-                name="availableSeats"
-                min="1"
-                max={
-                  driverVehicles.find(
-                    (vehicle) =>
-                      String(vehicle.vehicle_id) === offerForm.vehicleId
-                  )?.seating_capacity
-                }
-                step="1"
-                required
-                value={offerForm.availableSeats}
-                onChange={handleOfferFieldChange}
-              />
-            </label>
-
-            <label className="field">
-              <span>Cost per seat (₹)</span>
-              <input
-                type="number"
-                name="costPerSeat"
-                min="0"
-                max="99999999.99"
-                step="0.01"
-                required
-                value={offerForm.costPerSeat}
-                onChange={handleOfferFieldChange}
-              />
-            </label>
-
-            <div className="offer-submit-row">
-              {offerOptions.drivers.length === 0 && (
-                <p className="booking-error">
-                  No active users are available to offer rides.
+      <section className="content-section">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">YOUR ACCOUNT</p>
+            <h2>Your rides and bookings</h2>
+          </div>
+        </div>
+        {userDataError && <p className="error-note">{userDataError}</p>}
+        <div className="account-records">
+          <div>
+            <h3>Bookings</h3>
+            {bookings.length === 0 ? (
+              <p className="empty-note">No bookings yet.</p>
+            ) : bookings.map((booking) => (
+              <div className="record-row" key={booking.booking_id}>
+                <p>
+                  Booking #{booking.booking_id} · {booking.pickup} →{" "}
+                  {booking.drop_location} · {booking.status}
                 </p>
-              )}
-              {offerForm.driverId && driverVehicles.length === 0 && (
-                <p className="booking-error">
-                  This active user has no registered vehicles.
-                </p>
-              )}
-              {offerError && (
-                <p className="booking-error" role="alert">
-                  {offerError}
-                </p>
-              )}
-              {offerConfirmation && (
-                <p className="booking-confirmation-note" role="status">
-                  Ride offer #{offerConfirmation.rideOfferId} created with trip #
-                  {offerConfirmation.tripId}.
-                </p>
-              )}
-              <button
-                type="submit"
-                className="primary-button"
-                disabled={
-                  offerSubmitting ||
-                  offerOptions.drivers.length === 0 ||
-                  offerOptions.locations.length < 2 ||
-                  !offerForm.driverId ||
-                  driverVehicles.length === 0
-                }
-              >
-                {offerSubmitting ? "Creating offer..." : "Offer Ride"}
-              </button>
-            </div>
-          </form>
-        )}
+                {booking.status === "CONFIRMED" &&
+                  booking.trip_status === "SCHEDULED" &&
+                  !booking.has_paid && (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={cancellingBookingId === booking.booking_id}
+                      onClick={() => handleCancelBooking(booking.booking_id)}
+                    >
+                      {cancellingBookingId === booking.booking_id
+                        ? "Cancelling..."
+                        : "Cancel booking"}
+                    </button>
+                  )}
+              </div>
+            ))}
+          </div>
+          {cancellationError && (
+            <p className="booking-error" role="alert">{cancellationError}</p>
+          )}
+          <div>
+            <h3>Ride requests</h3>
+            {rideRequests.length === 0 ? (
+              <p className="empty-note">No ride requests yet.</p>
+            ) : rideRequests.map((rideRequest) => (
+              <p className="record-row" key={rideRequest.ride_request_id}>
+                Request #{rideRequest.ride_request_id} · {rideRequest.pickup} →{" "}
+                {rideRequest.drop_location} · {rideRequest.status}
+              </p>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section className="content-section">
@@ -712,7 +739,9 @@ export default function Home() {
           </div>
         </div>
 
-        {popularRoutes.length === 0 ? (
+        {popularRoutesError ? (
+          <p className="error-note">{popularRoutesError}</p>
+        ) : popularRoutes.length === 0 ? (
           <p className="empty-note">No route activity yet.</p>
         ) : (
           <div className="popular-grid">
@@ -1121,41 +1150,6 @@ export default function Home() {
 
             {!bookingConfirmation && (
               <>
-                <label className="passenger-selector-field">
-                  <span>Passenger</span>
-                  <select
-                    value={selectedPassengerId}
-                    disabled={
-                      passengerLoading ||
-                      bookingLoading ||
-                      passengers.length === 0
-                    }
-                    onChange={(event) =>
-                      setSelectedPassengerId(event.target.value)
-                    }
-                  >
-                    {passengers.map((passenger) => (
-                      <option key={passenger.user_id} value={passenger.user_id}>
-                        {passenger.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                {passengerLoading && (
-                  <p className="booking-status">Loading active passengers...</p>
-                )}
-                {passengerError && (
-                  <p className="booking-error">{passengerError}</p>
-                )}
-                {!passengerLoading &&
-                  !passengerError &&
-                  passengers.length === 0 && (
-                    <p className="booking-error">
-                      No active passengers are available to book this ride.
-                    </p>
-                  )}
-
                 <div className="modal-total">
                   <span>Total price</span>
                   <strong>
@@ -1178,12 +1172,7 @@ export default function Home() {
                 <button
                   type="button"
                   className="primary-button modal-book-button"
-                  disabled={
-                    passengerLoading ||
-                    passengers.length === 0 ||
-                    !selectedPassengerId ||
-                    bookingLoading
-                  }
+                  disabled={bookingLoading}
                   onClick={handleBooking}
                 >
                   {bookingLoading ? "Booking..." : "Book Ride"}

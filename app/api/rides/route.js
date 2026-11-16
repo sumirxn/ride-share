@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { authorizeRequest } from "@/lib/api-auth";
 
 export async function GET(request) {
+  const authorization = await authorizeRequest(request, ["PASSENGER"]);
+  if (authorization.response) return authorization.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const pickup = searchParams.get("pickup") || "";
@@ -18,7 +22,7 @@ export async function GET(request) {
         ro.cost_per_seat,
         ro.status
       FROM RIDE_OFFER ro
-      JOIN USER u ON ro.user_id = u.user_id
+      JOIN \`USER\` u ON ro.user_id = u.user_id AND u.is_active = TRUE
       JOIN LOCATION pickup ON ro.pickup_location_id = pickup.location_id
       JOIN LOCATION dropoff ON ro.drop_location_id = dropoff.location_id
       WHERE ro.status = 'OPEN'

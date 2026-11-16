@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { authorizeRequest } from "@/lib/api-auth";
 
 class RatingError extends Error {
   constructor(message, status) {
@@ -37,9 +38,12 @@ const ratingParticipantsQuery = `
   WHERE t.status = 'COMPLETED'
 `;
 
-export async function GET() {
+export async function GET(request) {
+  const authorization = await authorizeRequest(request, ["PASSENGER", "DRIVER"]);
+  if (authorization.response) return authorization.response;
+
   try {
-    const [ratingOptions] = await pool.query(`
+    const [ratingOptions] = await pool.execute(`
       SELECT DISTINCT
         eligible.trip_id,
         eligible.pickup,
@@ -85,8 +89,9 @@ export async function GET() {
             AND existing_rating.rated_to = participants.rated_by_id
         )
       ) AS eligible
+      WHERE eligible.rated_by_id = ?
       ORDER BY eligible.trip_id DESC, eligible.rated_by_name ASC
-    `);
+    `, [authorization.user.user_id]);
 
     return NextResponse.json(ratingOptions);
   } catch (error) {
@@ -99,6 +104,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const authorization = await authorizeRequest(request, ["PASSENGER", "DRIVER"]);
+  if (authorization.response) return authorization.response;
+
   try {
     let body;
     try {
@@ -108,7 +116,7 @@ export async function POST(request) {
     }
 
     const tripId = Number(body?.tripId);
-    const ratedById = Number(body?.ratedById);
+    const ratedById = Number(authorization.user.user_id);
     const ratedToId = Number(body?.ratedToId);
     const ratingValue = Number(body?.ratingValue);
     if (body?.review != null && typeof body.review !== "string") {
@@ -117,12 +125,8 @@ export async function POST(request) {
     const review =
       typeof body?.review === "string" ? body.review.trim() || null : null;
 
-    if (
-      !isPositiveInteger(tripId) ||
-      !isPositiveInteger(ratedById) ||
-      !isPositiveInteger(ratedToId)
-    ) {
-      throw new RatingError("Select a valid trip and both users", 400);
+    if (!isPositiveInteger(tripId) || !isPositiveInteger(ratedToId)) {
+      throw new RatingError("Select a valid trip and participant", 400);
     }
 
     if (ratedById === ratedToId) {
@@ -137,15 +141,16 @@ export async function POST(request) {
       throw new RatingError("Review must be 2,000 characters or fewer", 400);
     }
 
+    const participantFilter =
+      authorization.user.role === "DRIVER"
+        ? "(driver.user_id = ? AND passenger.user_id = ?)"
+        : "(passenger.user_id = ? AND driver.user_id = ?)";
     const [eligibleParticipants] = await pool.execute(
       `${ratingParticipantsQuery}
        AND t.trip_id = ?
-       AND (
-         (driver.user_id = ? AND passenger.user_id = ?)
-         OR (driver.user_id = ? AND passenger.user_id = ?)
-       )
+       AND ${participantFilter}
        LIMIT 1`,
-      [tripId, ratedById, ratedToId, ratedToId, ratedById]
+      [tripId, ratedById, ratedToId]
     );
 
     if (eligibleParticipants.length === 0) {

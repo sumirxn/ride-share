@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import getMongoClient from "@/lib/mongodb";
+import { authorizeRequest } from "@/lib/api-auth";
 
 export async function POST(request) {
+  const authorization = await authorizeRequest(request, ["PASSENGER"]);
+  if (authorization.response) return authorization.response;
+
   try {
     const body = await request.json();
 
-    const { userId, pickup, drop, seatsRequired } = body;
+    const { pickup, drop, seatsRequired } = body;
 
     if (!pickup || !drop || !seatsRequired || seatsRequired < 1) {
       return NextResponse.json(
@@ -14,11 +18,11 @@ export async function POST(request) {
       );
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("carpooling_system");
 
     const result = await db.collection("ride_activity").insertOne({
-      userId: userId || null,
+      userId: authorization.user.user_id,
       activityType: "RIDE_SEARCH",
       pickup,
       drop,
@@ -31,10 +35,10 @@ export async function POST(request) {
       activityId: result.insertedId
     });
   } catch (error) {
-    console.error(error);
+    console.error("Failed to record ride activity:", error);
     return NextResponse.json(
-      { message: "Failed to record ride activity" },
-      { status: 500 }
+      { message: "Ride activity analytics are temporarily unavailable" },
+      { status: 503 }
     );
   }
 }

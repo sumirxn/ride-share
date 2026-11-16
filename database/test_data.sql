@@ -2,14 +2,14 @@ USE carpooling_system;
 
 -- 1. USERS
 INSERT INTO `USER` (name, email, phone, password_hash, role) VALUES
-('Arun Kumar', 'arun@test.com', '9000000001', 'hash_arun', 'USER'),
-('Priya Sharma', 'priya@test.com', '9000000002', 'hash_priya', 'USER'),
-('Rahul Rao', 'rahul@test.com', '9000000003', 'hash_rahul', 'USER'),
+('Arun Kumar', 'arun@test.com', '9000000001', 'hash_arun', 'DRIVER'),
+('Priya Sharma', 'priya@test.com', '9000000002', 'hash_priya', 'PASSENGER'),
+('Rahul Rao', 'rahul@test.com', '9000000003', 'hash_rahul', 'DRIVER'),
 ('Admin User', 'admin@test.com', '9000000004', 'hash_admin', 'ADMIN'),
-('Sneha Reddy', 'sneha@test.com', '9000000005', 'hash_sneha', 'USER'),
-('Vikram Singh', 'vikram@test.com', '9000000006', 'hash_vikram', 'USER'),
-('Ananya Das', 'ananya@test.com', '9000000007', 'hash_ananya', 'USER'),
-('Karan Mehta', 'karan@test.com', '9000000008', 'hash_karan', 'USER');
+('Sneha Reddy', 'sneha@test.com', '9000000005', 'hash_sneha', 'DRIVER'),
+('Vikram Singh', 'vikram@test.com', '9000000006', 'hash_vikram', 'DRIVER'),
+('Ananya Das', 'ananya@test.com', '9000000007', 'hash_ananya', 'DRIVER'),
+('Karan Mehta', 'karan@test.com', '9000000008', 'hash_karan', 'DRIVER');
 
 -- 2. LOCATIONS
 INSERT INTO LOCATION (name, address, city, latitude, longitude) VALUES

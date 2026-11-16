@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { authorizeRequest } from "@/lib/api-auth";
 
 class BookingError extends Error {
   constructor(message, status) {
@@ -13,6 +14,9 @@ function isPositiveInteger(value) {
 }
 
 export async function POST(request) {
+  const authorization = await authorizeRequest(request, ["PASSENGER"]);
+  if (authorization.response) return authorization.response;
+
   let connection;
   let rideRequestId;
   let matchId;
@@ -28,39 +32,27 @@ export async function POST(request) {
       throw new BookingError("Request body must be valid JSON", 400);
     }
 
-    const passengerId = Number(body?.passengerId);
     const rideOfferId = Number(body?.rideOfferId);
     const seatsBooked = Number(body?.seatsBooked);
 
     if (
-      !isPositiveInteger(passengerId) ||
       !isPositiveInteger(rideOfferId) ||
       !isPositiveInteger(seatsBooked)
     ) {
       throw new BookingError(
-        "Passenger, ride and seat count must be valid positive integers",
+        "Ride and seat count must be valid positive integers",
         400
       );
     }
 
     connection = await pool.getConnection();
-
-    const [passengers] = await connection.execute(
-      `SELECT user_id
-       FROM \`USER\`
-       WHERE user_id = ? AND is_active = TRUE AND role = 'USER'`,
-      [passengerId]
-    );
-
-    if (passengers.length === 0) {
-      throw new BookingError("Selected passenger is not active", 404);
-    }
+    const passengerId = authorization.user.user_id;
 
     await connection.beginTransaction();
     transactionOpen = true;
 
     const [offers] = await connection.execute(
-      `SELECT ride_offer_id, pickup_location_id, drop_location_id,
+      `SELECT ride_offer_id, user_id, pickup_location_id, drop_location_id,
               departure_time, available_seats, status
        FROM RIDE_OFFER
        WHERE ride_offer_id = ?
@@ -71,6 +63,9 @@ export async function POST(request) {
     const offer = offers[0];
     if (!offer || offer.status !== "OPEN") {
       throw new BookingError("This ride is no longer open for booking", 409);
+    }
+    if (Number(offer.user_id) === Number(passengerId)) {
+      throw new BookingError("You cannot book your own ride", 403);
     }
 
     if (seatsBooked > offer.available_seats) {
@@ -208,5 +203,47 @@ export async function POST(request) {
     );
   } finally {
     connection?.release();
+  }
+}
+
+export async function GET(request) {
+  const authorization = await authorizeRequest(request, ["PASSENGER", "DRIVER"]);
+  if (authorization.response) return authorization.response;
+
+  try {
+    const ownerFilter =
+      authorization.user.role === "DRIVER" ? "ro.user_id = ?" : "rr.user_id = ?";
+    const [bookings] = await pool.execute(
+      `SELECT DISTINCT
+         b.booking_id, b.status, b.seats_booked, b.booked_at, b.trip_id,
+         rr.ride_request_id, rr.user_id AS passenger_id,
+         ro.ride_offer_id, ro.user_id AS driver_id,
+         t.start_time, t.end_time, t.status AS trip_status,
+         EXISTS (
+           SELECT 1 FROM PAYMENT p
+           WHERE p.booking_id = b.booking_id AND p.payment_status = 'PAID'
+         ) AS has_paid,
+         pickup.name AS pickup, dropoff.name AS drop_location,
+         driver.name AS driver_name, passenger.name AS passenger_name
+       FROM BOOKING b
+       JOIN \`MATCH\` m ON m.match_id = b.match_id
+       JOIN RIDE_REQUEST rr ON rr.ride_request_id = m.ride_request_id
+       JOIN RIDE_OFFER ro ON ro.ride_offer_id = m.ride_offer_id
+       JOIN \`USER\` driver ON driver.user_id = ro.user_id
+       JOIN \`USER\` passenger ON passenger.user_id = rr.user_id
+       JOIN TRIP t ON t.trip_id = b.trip_id
+       JOIN LOCATION pickup ON pickup.location_id = ro.pickup_location_id
+       JOIN LOCATION dropoff ON dropoff.location_id = ro.drop_location_id
+       WHERE ${ownerFilter}
+       ORDER BY b.booked_at DESC`,
+      [authorization.user.user_id]
+    );
+    return NextResponse.json(bookings);
+  } catch (error) {
+    console.error("Failed to load user bookings:", error);
+    return NextResponse.json(
+      { message: "Failed to load bookings" },
+      { status: 500 }
+    );
   }
 }

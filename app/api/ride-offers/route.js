@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/mysql";
+import { authorizeRequest } from "@/lib/api-auth";
 
 class RideOfferError extends Error {
   constructor(message, status) {
@@ -38,34 +39,42 @@ function toMysqlDateTime(value) {
   return `${yearText}-${monthText}-${dayText} ${hourText}:${minuteText}:00`;
 }
 
-export async function GET() {
+export async function GET(request) {
+  const authorization = await authorizeRequest(request, ["DRIVER"]);
+  if (authorization.response) return authorization.response;
+
   try {
-    const [drivers, vehicles, locations] = await Promise.all([
-      pool.query(`
-        SELECT user_id, name
-        FROM \`USER\`
-        WHERE is_active = TRUE
-        ORDER BY name ASC
-      `),
-      pool.query(`
+    const [vehicles, locations, offers] = await Promise.all([
+      pool.execute(`
         SELECT v.vehicle_id, v.owner_id, v.license_plate,
                v.vehicle_type, v.seating_capacity
         FROM VEHICLE v
         JOIN \`USER\` u ON u.user_id = v.owner_id
-        WHERE u.is_active = TRUE
+        WHERE u.is_active = TRUE AND v.owner_id = ?
         ORDER BY v.license_plate ASC
-      `),
+      `, [authorization.user.user_id]),
       pool.query(`
         SELECT location_id, name, city
         FROM LOCATION
         ORDER BY city ASC, name ASC
       `),
+      pool.execute(`
+        SELECT ro.ride_offer_id, ro.departure_time, ro.available_seats,
+               ro.cost_per_seat, ro.status, pickup.name AS pickup,
+               dropoff.name AS drop_location, t.trip_id, t.status AS trip_status
+        FROM RIDE_OFFER ro
+        JOIN LOCATION pickup ON pickup.location_id = ro.pickup_location_id
+        JOIN LOCATION dropoff ON dropoff.location_id = ro.drop_location_id
+        JOIN TRIP t ON t.ride_offer_id = ro.ride_offer_id
+        WHERE ro.user_id = ?
+        ORDER BY ro.departure_time DESC
+      `, [authorization.user.user_id]),
     ]);
 
     return NextResponse.json({
-      drivers: drivers[0],
       vehicles: vehicles[0],
       locations: locations[0],
+      offers: offers[0],
     });
   } catch (error) {
     console.error("Failed to load ride offer options:", error);
@@ -77,6 +86,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
+  const authorization = await authorizeRequest(request, ["DRIVER"]);
+  if (authorization.response) return authorization.response;
+
   let connection;
   let transactionOpen = false;
 
@@ -88,7 +100,7 @@ export async function POST(request) {
       throw new RideOfferError("Request body must be valid JSON", 400);
     }
 
-    const driverId = Number(body?.driverId);
+    const driverId = Number(authorization.user.user_id);
     const vehicleId = Number(body?.vehicleId);
     const pickupLocationId = Number(body?.pickupLocationId);
     const dropLocationId = Number(body?.dropLocationId);
@@ -97,7 +109,6 @@ export async function POST(request) {
     const departureTime = toMysqlDateTime(body?.departureTime);
 
     if (
-      !isPositiveInteger(driverId) ||
       !isPositiveInteger(vehicleId) ||
       !isPositiveInteger(pickupLocationId) ||
       !isPositiveInteger(dropLocationId) ||
@@ -132,14 +143,6 @@ export async function POST(request) {
     connection = await pool.getConnection();
     await connection.beginTransaction();
     transactionOpen = true;
-
-    const [drivers] = await connection.execute(
-      "SELECT user_id FROM `USER` WHERE user_id = ? AND is_active = TRUE",
-      [driverId]
-    );
-    if (drivers.length === 0) {
-      throw new RideOfferError("Selected driver is not an active user", 404);
-    }
 
     const [vehicles] = await connection.execute(
       `SELECT v.vehicle_id, v.seating_capacity

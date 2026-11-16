@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import getMongoClient from "@/lib/mongodb";
+import { authorizeRequest } from "@/lib/api-auth";
 
-export async function GET() {
+export async function GET(request) {
+  const authorization = await authorizeRequest(request);
+  if (authorization.response) return authorization.response;
+
   try {
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("carpooling_system");
 
     const routes = await db.collection("ride_activity").aggregate([
@@ -26,10 +30,10 @@ export async function GET() {
 
     return NextResponse.json(routes);
   } catch (error) {
-    console.error(error);
+    console.error("Failed to retrieve popular routes:", error);
     return NextResponse.json(
-      { message: "Failed to retrieve popular routes" },
-      { status: 500 }
+      { message: "Popular-route analytics are temporarily unavailable" },
+      { status: 503 }
     );
   }
 }
